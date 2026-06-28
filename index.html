@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spin Wheel Nama</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .title {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+        .wheel-container {
+            position: relative;
+            width: 90vw;
+            max-width: 500px;
+            aspect-ratio: 1;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #e74c3c;
+            z-index: 10;
+            filter: drop-shadow(0px 3px 3px rgba(0,0,0,0.3));
+        }
+        .controls {
+            margin-top: 35px;
+            text-align: center;
+        }
+        button {
+            padding: 15px 50px;
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            background-color: #2ecc71;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(46, 204, 113, 0.4);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        button:hover {
+            background-color: #27ae60;
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result-box {
+            margin-top: 25px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #result {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            background: #fff;
+            padding: 15px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+            text-align: center;
+        }
+        #result.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        @media (max-width: 600px) {
+            #result { font-size: 18px; padding: 12px 20px; }
+            button { font-size: 18px; padding: 12px 40px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h2 class="title">Acak Nama</h2>
+
+    <div class="wheel-container">
+        <!-- Segitiga penunjuk -->
+        <div class="pointer"></div>
+        <!-- Resolusi canvas diperbesar (800x800) agar teks terlihat tajam -->
+        <canvas id="wheel" width="800" height="800"></canvas>
+    </div>
+
+    <div class="controls">
+        <button id="spinBtn" onclick="spin()">PUTAR!</button>
+    </div>
+
+    <div class="result-box">
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Array nama yang telah Anda berikan
+        const names = [
+            "Alfianda Nurfajar Rohaenda", "Alma Nuraini", "Alya Ramadhani Nur Aini", 
+            "Anisa Azzahra", "Astny Alawi Mupiz", "Azarah Tusita Yusliani", 
+            "Bima Abi sakti", "Didan Ramdhani Abdul Matin", "Diena Hendry Rahmawati", 
+            "Dilla Farida", "Dzaky Fauzan", "Finna Nazwa Astiani", 
+            "Juanda Alfiansyah", "Lilih Humairotul Habibah", "Malvian Mahpud Efendi ali", 
+            "Maryam Puspa Dewi", "Mochamad Zacky", "Mohamad Rezo Alfairuz Tampolo", 
+            "Muhamad Rafli Alfarizi", "Nabil Wibowo", "Nirvana Pretty Ali", 
+            "Pasya Dwi Andika", "Rahma Rohimah", "Riska Amelia", 
+            "Romansyah Saputra", "Sabrina Nur Oktaviani", "Sekar Rahmawati", 
+            "Syifa Faturrohmah Az Zahra", "Vasha Naysila Hidayat", "Windi Wulandari"
+        ];
+
+        // Palet warna cerah bergantian
+        const colors = [
+            "#FF595E", "#FFCA3A", "#8AC926", "#1982C4", "#6A4C93", "#F564A9"
+        ];
+
+        const canvas = document.getElementById("wheel");
+        const ctx = canvas.getContext("2d");
+        const radius = canvas.width / 2;
+        const arc = Math.PI * 2 / names.length;
+        
+        let startAngle = 0;
+        let spinTimeout = null;
+        let spinAngleStart = 0;
+        let spinTime = 0;
+        let spinTimeTotal = 0;
+        let isSpinning = false;
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#ffffff";
+            
+            ctx.font = "bold 16px 'Segoe UI', Tahoma, sans-serif";
+            ctx.textBaseline = "middle";
+
+            for(let i = 0; i < names.length; i++) {
+                const angle = startAngle + i * arc;
+                ctx.fillStyle = colors[i % colors.length];
+                
+                // Gambar potongan (slice)
+                ctx.beginPath();
+                ctx.arc(radius, radius, radius, angle, angle + arc, false);
+                ctx.lineTo(radius, radius);
+                ctx.fill();
+                ctx.stroke();
+
+                // Gambar teks nama
+                ctx.save();
+                ctx.fillStyle = "white";
+                
+                // Pindah ke tengah, putar sesuai posisi slice, lalu geser ke pinggir
+                ctx.translate(radius, radius);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = "right";
+                
+                // radius - 30 adalah jarak ujung teks ke sisi luar.
+                // Parameter ke-4 (radius - 90) memaksa teks menyempit jika terlalu panjang.
+                ctx.fillText(names[i], radius - 30, 0, radius - 90);
+                ctx.restore();
+            }
+
+            // Gambar lingkaran penutup di tengah roda
+            ctx.beginPath();
+            ctx.arc(radius, radius, 40, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "rgba(0,0,0,0.2)";
+            ctx.stroke();
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            
+            document.getElementById('spinBtn').disabled = true;
+            document.getElementById('result').classList.remove('show');
+            
+            // Acak kecepatan awal dan durasi putaran
+            spinAngleStart = Math.random() * 10 + 20; 
+            spinTime = 0;
+            spinTimeTotal = Math.random() * 3000 + 4000; // Durasi antara 4-7 detik
+            
+            rotateWheel();
+        }
+
+        function rotateWheel() {
+            spinTime += 30; // Kecepatan frame animasi
+            if(spinTime >= spinTimeTotal) {
+                stopRotateWheel();
+                return;
+            }
+            // Efek melambat di akhir putaran (ease out)
+            const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);
+            startAngle += (spinAngle * Math.PI / 180);
+            drawWheel();
+            spinTimeout = setTimeout(rotateWheel, 30);
+        }
+
+        function stopRotateWheel() {
+            clearTimeout(spinTimeout);
+            
+            // Kalkulasi nama mana yang berhenti di posisi penunjuk (atas: 270 derajat atau 1.5 * PI)
+            const currentRotation = startAngle % (Math.PI * 2);
+            const pointerAngle = Math.PI * 1.5; 
+            let relativeAngle = (pointerAngle - currentRotation) % (Math.PI * 2);
+            if (relativeAngle < 0) relativeAngle += Math.PI * 2;
+            
+            const index = Math.floor(relativeAngle / arc);
+            
+            // Tampilkan hasil
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerText = "🎉 " + names[index] + " 🎉";
+            resultDiv.classList.add('show');
+            
+            isSpinning = false;
+            document.getElementById('spinBtn').disabled = false;
+        }
+
+        // Fungsi matematika untuk memperhalus berhentinya roda
+        function easeOut(t, b, c, d) {
+            const ts = (t /= d) * t;
+            const tc = ts * t;
+            return b + c * (tc + -3 * ts + 3 * t);
+        }
+
+        // Jalankan render awal saat memuat halaman
+        drawWheel();
+    </script>
+</body>
+</html>
